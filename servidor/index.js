@@ -1,28 +1,41 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import mysql from 'mysql2/promise';
 
+const PORT = process.env.PORT || 3001;
+// Admite uno o varios orígenes separados por comas, p.ej. "https://mi-app.vercel.app,http://localhost:5173"
+const CORS_ORIGIN = (process.env.CORS_ORIGIN || '*').split(',').map(o => o.trim());
+const corsOptions = CORS_ORIGIN.length === 1 ? CORS_ORIGIN[0] : CORS_ORIGIN;
+
+const DB_CONFIG = {
+  host: process.env.DB_HOST || 'localhost',
+  port: Number(process.env.DB_PORT) || 3307,
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+};
+const DB_NAME = process.env.DB_NAME || 'pizarra_db';
+
 const app = express();
-app.use(cors());
+app.use(cors({ origin: corsOptions }));
 app.use(express.json());
+
+// Health check para servicios de hosting (Render, etc.)
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', service: 'pizarra-virtual-servidor' });
+});
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
+    origin: corsOptions,
     methods: ['GET', 'POST']
   }
 });
 
-const db = mysql.createPool({
-  host: 'localhost',
-  port: 3307,
-  user: 'root',
-  password: '',
-  database: 'pizarra_db'
-});
+const db = mysql.createPool({ ...DB_CONFIG, database: DB_NAME });
 
 let dbConnected = false;
 let memoriaTrazos = {}; // Objeto para guardar trazos en RAM si no hay BBDD: { 'sala1': [trazo1, trazo2...], 'sala2': [...] }
@@ -30,13 +43,8 @@ let memoriaTrazos = {}; // Objeto para guardar trazos en RAM si no hay BBDD: { '
 // Inicializar BBDD
 async function initDB() {
   try {
-    const connection = await mysql.createConnection({
-      host: 'localhost',
-      port: 3307,
-      user: 'root',
-      password: ''
-    });
-    await connection.query('CREATE DATABASE IF NOT EXISTS pizarra_db');
+    const connection = await mysql.createConnection(DB_CONFIG);
+    await connection.query(`CREATE DATABASE IF NOT EXISTS ${DB_NAME}`);
     await connection.end();
 
     const createTableQuery = `
@@ -58,6 +66,36 @@ async function initDB() {
 
 initDB();
 
+// Envía un trazo al destino emitiendo el evento adecuado según su tipo
+function emitirTrazo(destino, trazo) {
+  if (trazo.herramienta === 'fondo') {
+    destino.emit('fondo_pizarra', trazo.fondo);
+  } else {
+    destino.emit('dibujar', trazo);
+  }
+}
+
+// Obtiene el historial de trazos de una sala, desde BBDD o memoria RAM
+async function obtenerHistorial(sala) {
+  if (dbConnected) {
+    const [rows] = await db.query('SELECT datos FROM trazos WHERE sala = ? ORDER BY id ASC', [sala]);
+    return rows.map(row => typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos);
+  }
+  return memoriaTrazos[sala] || [];
+}
+
+// Guarda un trazo en BBDD o memoria RAM
+async function guardarTrazo(sala, trazo) {
+  if (dbConnected) {
+    await db.query('INSERT INTO trazos (sala, datos) VALUES (?, ?)', [sala, JSON.stringify(trazo)]);
+  } else {
+    if (!memoriaTrazos[sala]) {
+      memoriaTrazos[sala] = [];
+    }
+    memoriaTrazos[sala].push(trazo);
+  }
+}
+
 io.on('connection', (socket) => {
   console.log(`Usuario conectado: ${socket.id}`);
 
@@ -66,29 +104,11 @@ io.on('connection', (socket) => {
     socket.join(sala);
     console.log(`Usuario ${socket.id} se unió a la sala: ${sala}`);
 
-    if (dbConnected) {
-      try {
-        const [rows] = await db.query('SELECT datos FROM trazos WHERE sala = ? ORDER BY id ASC', [sala]);
-        rows.forEach(row => {
-          const trazo = typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos;
-          if (trazo.herramienta === 'fondo') {
-            socket.emit('fondo_pizarra', trazo.fondo);
-          } else {
-            socket.emit('dibujar', trazo);
-          }
-        });
-      } catch (error) {
-        console.error('Error cargando historial de la base de datos:', error);
-      }
-    } else if (memoriaTrazos[sala]) {
-      // Si tenemos trazos en memoria RAM, se los enviamos al usuario nuevo
-      memoriaTrazos[sala].forEach(trazo => {
-        if (trazo.herramienta === 'fondo') {
-          socket.emit('fondo_pizarra', trazo.fondo);
-        } else {
-          socket.emit('dibujar', trazo);
-        }
-      });
+    try {
+      const historial = await obtenerHistorial(sala);
+      historial.forEach(trazo => emitirTrazo(socket, trazo));
+    } catch (error) {
+      console.error('Error cargando historial de la base de datos:', error);
     }
   });
 
@@ -97,18 +117,10 @@ io.on('connection', (socket) => {
     // data = { sala: 'x', trazo: {...} }
     socket.to(data.sala).emit('dibujar', data.trazo);
 
-    if (dbConnected) {
-      try {
-        await db.query('INSERT INTO trazos (sala, datos) VALUES (?, ?)', [data.sala, JSON.stringify(data.trazo)]);
-      } catch (error) {
-        console.error('Error guardando trazo en base de datos:', error);
-      }
-    } else {
-      // Guardar en memoria RAM si MySQL no está disponible
-      if (!memoriaTrazos[data.sala]) {
-        memoriaTrazos[data.sala] = [];
-      }
-      memoriaTrazos[data.sala].push(data.trazo);
+    try {
+      await guardarTrazo(data.sala, data.trazo);
+    } catch (error) {
+      console.error('Error guardando trazo en base de datos:', error);
     }
   });
 
@@ -121,71 +133,47 @@ io.on('connection', (socket) => {
       fondo: data.fondo
     };
 
-    if (dbConnected) {
-      try {
-        await db.query('INSERT INTO trazos (sala, datos) VALUES (?, ?)', [data.sala, JSON.stringify(trazoFondo)]);
-      } catch (error) {
-        console.error('Error guardando fondo en base de datos:', error);
-      }
-    } else {
-      if (!memoriaTrazos[data.sala]) {
-        memoriaTrazos[data.sala] = [];
-      }
-      memoriaTrazos[data.sala].push(trazoFondo);
+    try {
+      await guardarTrazo(data.sala, trazoFondo);
+    } catch (error) {
+      console.error('Error guardando fondo en base de datos:', error);
     }
   });
 
   // Deshacer el último trazo
   socket.on('deshacer_ultimo', async (sala) => {
-    if (dbConnected) {
-      try {
+    try {
+      if (dbConnected) {
         const [rows] = await db.query('SELECT id FROM trazos WHERE sala = ? ORDER BY id DESC LIMIT 1', [sala]);
         if (rows.length > 0) {
           await db.query('DELETE FROM trazos WHERE id = ?', [rows[0].id]);
         }
-        
-        io.in(sala).emit('limpiar_lienzo');
-        const [allRows] = await db.query('SELECT datos FROM trazos WHERE sala = ? ORDER BY id ASC', [sala]);
-        allRows.forEach(row => {
-          const trazo = typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos;
-          if (trazo.herramienta === 'fondo') {
-            io.in(sala).emit('fondo_pizarra', trazo.fondo);
-          } else {
-            io.in(sala).emit('dibujar', trazo);
-          }
-        });
-      } catch (error) {
-        console.error('Error deshaciendo trazo:', error);
-      }
-    } else {
-      if (memoriaTrazos[sala] && memoriaTrazos[sala].length > 0) {
+      } else if (memoriaTrazos[sala] && memoriaTrazos[sala].length > 0) {
         memoriaTrazos[sala].pop();
-        io.in(sala).emit('limpiar_lienzo');
-        memoriaTrazos[sala].forEach(trazo => {
-          if (trazo.herramienta === 'fondo') {
-            io.in(sala).emit('fondo_pizarra', trazo.fondo);
-          } else {
-            io.in(sala).emit('dibujar', trazo);
-          }
-        });
+      } else {
+        return;
       }
+
+      io.in(sala).emit('limpiar_lienzo');
+      const historial = await obtenerHistorial(sala);
+      historial.forEach(trazo => emitirTrazo(io.in(sala), trazo));
+    } catch (error) {
+      console.error('Error deshaciendo trazo:', error);
     }
   });
 
   // Limpiar lienzo
   socket.on('limpiar_lienzo', async (sala) => {
     socket.to(sala).emit('limpiar_lienzo');
-    
-    if (dbConnected) {
-      try {
+
+    try {
+      if (dbConnected) {
         await db.query('DELETE FROM trazos WHERE sala = ?', [sala]);
-      } catch (error) {
-        console.error('Error borrando trazos de la base de datos:', error);
+      } else if (memoriaTrazos[sala]) {
+        memoriaTrazos[sala] = [];
       }
-    }
-    
-    if (!dbConnected && memoriaTrazos[sala]) {
-      memoriaTrazos[sala] = [];
+    } catch (error) {
+      console.error('Error borrando trazos de la base de datos:', error);
     }
   });
 
@@ -194,7 +182,6 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });

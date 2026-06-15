@@ -7,7 +7,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 
 import './App.css';
 
-const socket = io('http://localhost:3001');
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+const socket = io(SOCKET_URL);
 
 function App() {
   const canvasRef = useRef(null);
@@ -18,7 +19,7 @@ function App() {
   const [color, setColor] = useState('#000000');
   const [grosor, setGrosor] = useState(3);
   const [herramienta, setHerramienta] = useState('lapiz'); // lapiz, linea, rectangulo, circulo
-  const [sala, setSala] = useState('General');
+  const [sala] = useState('General');
   
   const snapshotRef = useRef(null); // Foto del canvas para hacer "preview" de las formas
   const posRef = useRef({ x: 0, y: 0 }); // Posición inicial al hacer click
@@ -145,7 +146,7 @@ function App() {
     }
   };
 
-  const dibujarTrazo = (trazo, emitir) => {
+  function dibujarTrazo(trazo, emitir) {
     const ctx = contextRef.current;
     if (!ctx) return;
 
@@ -173,25 +174,25 @@ function App() {
     if (emitir && trazo.herramienta === 'lapiz') {
       socket.emit('dibujar', { sala, trazo });
     }
-  };
+  }
 
-  const limpiarCanvasLocal = () => {
+  function limpiarCanvasLocal() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const context = canvas.getContext('2d');
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, canvas.width, canvas.height);
     bgImageRef.current = null;
-  };
+  }
 
   const limpiarLienzo = () => {
     limpiarCanvasLocal();
     socket.emit('limpiar_lienzo', sala);
   };
 
-  const deshacer = () => {
+  function deshacer() {
     socket.emit('deshacer_ultimo', sala);
-  };
+  }
 
   const descargarImagen = () => {
     const canvas = canvasRef.current;
@@ -202,7 +203,7 @@ function App() {
     link.click();
   };
 
-  const cargarFondoLocal = (dataURL) => {
+  function cargarFondoLocal(dataURL) {
     const img = new Image();
     img.onload = () => {
       const canvas = canvasRef.current;
@@ -216,7 +217,7 @@ function App() {
       bgImageRef.current = dataURL;
     };
     img.src = dataURL;
-  };
+  }
 
   const subirPDF = async (e) => {
     const file = e.target.files[0];
