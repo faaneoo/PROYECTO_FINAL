@@ -1,0 +1,152 @@
+.dashboard-contenedor {
+  min-height: 100vh;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dashboard-cabecera {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  gap: 1rem;
+}
+
+.dashboard-cabecera h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.dashboard-cabecera h1 span {
+  font-size: 1rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.7);
+  display: block;
+}
+
+.dashboard-acciones-cabecera {
+  display: flex;
+  gap: 10px;
+}
+
+.dashboard-contenido {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dashboard-tarjeta {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  padding: 1.5rem;
+}
+
+.dashboard-tarjeta h2 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.lista-salas {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sala-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px 15px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #fff;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sala-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateX(4px);
+}
+
+.sala-item .sala-nombre {
+  font-weight: 600;
+}
+
+.sala-item .sala-meta {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.form-fila {
+  display: flex;
+  gap: 10px;
+}
+
+.form-fila input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.form-fila input:focus {
+  outline: none;
+  border-color: #00d2ff;
+}
+
+.form-fila button {
+  background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+  border: none;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.btn-secundario {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-secundario:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.mensaje-vacio {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+}
+
+.mensaje-error {
+  background: rgba(255, 65, 108, 0.2);
+  border: 1px solid rgba(255, 65, 108, 0.4);
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
