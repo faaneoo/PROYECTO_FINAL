@@ -10,14 +10,13 @@ body {
   font-family: 'Outfit', system-ui, sans-serif;
   background: linear-gradient(135deg, #1f1c2c, #928DAB);
   color: #fff;
-  height: 100vh;
-  overflow: hidden;
 }
 
 .App {
   display: flex;
   flex-direction: row;
   height: 100vh;
+  overflow: hidden;
   padding: 1rem;
   gap: 1rem;
 }
