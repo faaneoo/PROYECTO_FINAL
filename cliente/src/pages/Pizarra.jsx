@@ -49,6 +49,13 @@ export default function Pizarra() {
       navigate('/');
     });
 
+    socket.on('connect_error', (err) => {
+      if (err.message === 'Token inválido o caducado' || err.message === 'No autenticado') {
+        alert('Tu sesión ha expirado. Vuelve a iniciar sesión.');
+        navigate('/login');
+      }
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -81,20 +88,21 @@ export default function Pizarra() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [sala]);
 
-  const obtenerPosicionRaton = (e) => {
+  const obtenerPosicion = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;    // Factor de escala X
-    const scaleY = canvas.height / rect.height;  // Factor de escala Y
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const punto = e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
+      x: (punto.clientX - rect.left) * scaleX,
+      y: (punto.clientY - rect.top) * scaleY
     };
   };
 
   const empezarDibujo = (e) => {
     setDibujando(true);
-    posRef.current = obtenerPosicionRaton(e);
+    posRef.current = obtenerPosicion(e);
     // Guardar una foto del lienzo actual para la vista previa
     snapshotRef.current = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
   };
@@ -105,7 +113,7 @@ export default function Pizarra() {
 
     // Si estábamos dibujando una forma geométrica, emitimos el trazo final al soltar
     if (herramienta !== 'lapiz') {
-      const posFinal = obtenerPosicionRaton(e);
+      const posFinal = obtenerPosicion(e);
       const trazoFinal = {
         herramienta,
         x0: posRef.current.x,
@@ -123,7 +131,7 @@ export default function Pizarra() {
   const dibujar = (e) => {
     if (!dibujando) return;
 
-    const nuevaPos = obtenerPosicionRaton(e);
+    const nuevaPos = obtenerPosicion(e);
 
     if (herramienta === 'lapiz') {
       const trazo = {
@@ -296,7 +304,11 @@ export default function Pizarra() {
           onMouseUp={pararDibujo}
           onMouseOut={pararDibujo}
           onMouseMove={dibujar}
+          onTouchStart={(e) => { e.preventDefault(); empezarDibujo(e); }}
+          onTouchMove={(e) => { e.preventDefault(); dibujar(e); }}
+          onTouchEnd={pararDibujo}
           className="lienzo"
+          style={{ touchAction: 'none' }}
         />
       </main>
     </div>

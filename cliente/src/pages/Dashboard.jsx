@@ -105,12 +105,19 @@ export default function Dashboard() {
                 <p className="mensaje-vacio">Todavía no tienes salas privadas.</p>
               )}
               {salas.filter(s => s.privada).map((sala) => (
-                <Link key={sala.codigo} to={`/pizarra/${sala.codigo}`} className="sala-item">
-                  <span className="sala-nombre">{sala.nombre}</span>
-                  <span className="sala-meta">
-                    {sala.esPropietaria ? 'Propietario' : 'Invitado'} · código: {sala.codigo}
-                  </span>
-                </Link>
+                <div key={sala.codigo} className="sala-fila">
+                  <Link to={`/pizarra/${sala.codigo}`} className="sala-item">
+                    <span className="sala-nombre">{sala.nombre}</span>
+                    <span className="sala-meta">{sala.esPropietaria ? 'Propietario' : 'Invitado'}</span>
+                  </Link>
+                  <button
+                    className="btn-copiar"
+                    title={`Copiar código: ${sala.codigo}`}
+                    onClick={() => navigator.clipboard.writeText(sala.codigo)}
+                  >
+                    📋 {sala.codigo}
+                  </button>
+                </div>
               ))}
             </div>
           )}
