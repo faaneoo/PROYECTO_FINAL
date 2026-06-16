@@ -18,6 +18,7 @@ router.get('/mias', async (req, res) => {
   try {
     const [filas] = await pool.query(
       `SELECT DISTINCT s.id, s.nombre, s.codigo, s.privada, s.propietario_id,
+              s.fecha_creacion,
               (s.propietario_id = ?) AS esPropietaria
        FROM salas s
        LEFT JOIN salas_miembros m ON m.sala_id = s.id AND m.usuario_id = ?
